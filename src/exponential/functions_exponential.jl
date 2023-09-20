@@ -13,10 +13,10 @@
 
  and f(t) is n x 1 with excitations in the form
 
-  f_j(t) = sum_k  c_jk exp( beta_jk t + im*phi_jk)
+  f_j(t) = sum_k  c_jk exp( beta_jk t + cphi_jk)
 
  where j is the DOF, c_jk is a complex amplitude, 
- beta_jk = omega_jk * i is a complex angular frequency and phi_jk the phase.
+ beta_jk = omega_jk * i is a complex angular frequency and cphi_jk the phase.
 
  Loading information is given by using a dictionary:
 
@@ -32,11 +32,11 @@
    ``c_jk*(KD_jk \\ e_j) -> sol_jk`` 
 
  
- ``im*w_jk -> beta_jk`` 
+ if the excitation is sine or cosine in the exponential form ``im*w_jk -> beta_jk`` 
 
  and
 
- ``im*phi_jk -> cphi_jk`` 
+ if the excitation is sine or cosine in the exponential form ``im*phi_jk -> cphi_jk`` 
 
 
  Inputs:
@@ -59,9 +59,10 @@
 
 
 """
+
 function Process_exponential(M::AbstractMatrix{T}, C::AbstractMatrix{T},
-                     K::AbstractMatrix{T}, 
-                     load_data::Dict{Int64,Vector{ComplexF64}}) where T
+    K::AbstractMatrix{T}, 
+    load_data::Dict{Int64,Vector{ComplexF64}}) where T
 
 
     # Basic assertions
@@ -74,7 +75,9 @@ function Process_exponential(M::AbstractMatrix{T}, C::AbstractMatrix{T},
     # Loop over the dictionary to find the total number of data to be cached
     ncol = 0
     for j in keys(load_data)
+
         ncol += Int(length(load_data[j])/3)
+        
     end
 
     # Allocate caches  
@@ -105,29 +108,23 @@ function Process_exponential(M::AbstractMatrix{T}, C::AbstractMatrix{T},
             # Amplitude
             c_jk = data[3*(k-1)+1]
 
-            # Angular frequency
-            w_jk = real(data[3*(k-1)+2])
+            # beta coefficient
+            beta_jk[cont] = data[3*(k-1)+2]
 
             # Phase
-            phi_jk = real(data[3*(k-1)+3])
+            cphi_jk[cont] = data[3*(k-1)+3]
 
             # Build KD_jk
-            KD_jk = K + im*w_jk*C - M*(w_jk)^2 
+            KD_jk = K + (beta_jk[cont]*C) + (M*(beta_jk[cont]^2)) 
 
             # Solve for  K_jk\e_j and multiply by c_jk
             sol_jk[:,cont] .= c_jk*(KD_jk\e_j)
-           
-            # Store im*w_jk
-            beta_jk[cont] = im*w_jk 
-
-            # Store im*phi_jk
-            cphi_jk[cont] = im*phi_jk 
 
             # Increment the counter
             cont += 1
 
         end #k
-        
+
         # Unset e_j 
         e_j[j] = 0.0
 
